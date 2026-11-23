@@ -1,12 +1,323 @@
-import {useEffect,useMemo,useState} from 'react';import {uid,toMarkdown,csv} from './logic';import './styles.css';
-const cfg={"slug":"music-theory-lab","name":"Tone Lab","purpose":"Interactive notes, intervals, scales, chord exercises, hints, validation, and progress.","kind":"music","fields":["Exercise","topic","prompt","answer","hint"],"accent":"violet"} as const;const pages=[['home','Home'],['workspace','Exercises'],['guide','Notes & intervals'],['examples','Scale guide'],['reference','Progress'],['help','Help']] as const;type Page=typeof pages[number][0];type Item={id:string;title:string;createdAt:string;[key:string]:string};const key='local-portfolio:'+cfg.slug;const makeDemo=():Item[]=>['Field note — Alder','Follow-up — Miro','Review — Sol','Plan — Juniper','Archive — Nia','Decision — Rowan','Reminder — Theo','Research — Imani','Checklist — Ellis','Exception — Saffron'].map((title,i)=>({id:'demo-'+i,title,createdAt:new Date(Date.now()-i*86400000).toISOString(),[cfg.fields[1]]:['In focus','Scheduled','Reviewed','Waiting','Reference'][i%5],[cfg.fields[2]]:['Ready','Needs review','Complete','Paused','Archived'][i%5],[cfg.fields[3]]:new Date(Date.now()+(i-3)*86400000).toISOString().slice(0,10),[cfg.fields[4]]:i===4?'A longer fictional note showing a realistic exception, the decision taken, and what should be checked before the record is used again.':'Fictional demo data for a populated local workspace.'}));function download(n:string,s:string,t='text/plain'){const x=document.createElement('a');x.href=URL.createObjectURL(new Blob([s],{type:t}));x.download=n;x.click();URL.revokeObjectURL(x.href)}
-export default function App(){const requested=location.hash.slice(1);const [page,setPage]=useState<Page|'notfound'>(()=>pages.some(([id])=>id===requested)?requested as Page:requested?'notfound':'home');const [records,setRecords]=useState<Item[]>(()=>{try{return JSON.parse(localStorage.getItem(key)||'null')||makeDemo()}catch{return makeDemo()}});const [form,setForm]=useState<Record<string,string>>({});const [query,setQuery]=useState('');const [notice,setNotice]=useState('');const [answer,setAnswer]=useState('');const [editing,setEditing]=useState<Item|null>(null);useEffect(()=>{document.title=(page==='home'?cfg.name:page==='notfound'?'Page not found':cfg.name+' — '+page);if(page!=='notfound')location.hash=page},[page]);const save=(x:Item[])=>{setRecords(x);localStorage.setItem(key,JSON.stringify(x))};const filtered=useMemo(()=>records.filter(r=>JSON.stringify(r).toLowerCase().includes(query.toLowerCase())),[records,query]);const add=(ev:React.FormEvent)=>{ev.preventDefault();const title=form[cfg.fields[0]]?.trim();if(!title){setNotice('Add a '+cfg.fields[0].toLowerCase()+' before saving.');return}const next={id:editing?.id||uid(),title,createdAt:editing?.createdAt||new Date().toISOString()} as Item;cfg.fields.forEach(f=>next[f]=form[f]||'');save(editing?records.map(r=>r.id===editing.id?next:r):[next,...records]);setForm({});setEditing(null);setNotice(editing?'Record updated locally.':'Saved locally. You can now find it in the archive or export it.')};const importJson=async(file?:File)=>{if(!file)return;try{const parsed=JSON.parse(await file.text());if(!Array.isArray(parsed)||!parsed.every(x=>x&&typeof x.title==='string'))throw new Error();save(parsed);setNotice('Imported '+parsed.length+' records into this browser.')}catch{setNotice('That file is not a valid export. Your existing records were left unchanged.')}};return <div className={'app '+cfg.accent}><div className="shell"><header><div className="brand"><small>LOCAL EDITION</small>{cfg.name}</div><nav aria-label="Primary">{pages.map(([id,label])=><button className={page===id?'active':''} key={id} onClick={()=>setPage(id)}>{label}</button>)}</nav></header>{page==='home'&&<Home records={records} open={()=>setPage('workspace')}/>} {page==='workspace'&&<Workspace/>}{page==='notfound'&&<NotFound/>}{page==='guide'&&<Guide title="Notes & intervals"/>}{page==='examples'&&<Examples/>}{page==='reference'&&<Reference/>}{page==='help'&&<Help/>}</div></div>;
-function Home({records,open}:{records:Item[];open:()=>void}){return <><section className="hero"><div><p className="eyebrow">A CLEARER WAY TO WORK LOCALLY</p><h1>Tone Lab keeps the important details <i>findable.</i></h1><p>Music theory becomes tangible when a concept is paired with a small question and an immediate explanation.</p><div className="actions"><button className="primary" onClick={open}>Open exercises</button><button onClick={()=>download(cfg.slug+'-demo.md',toMarkdown(cfg.name,records))}>Export demo</button></div></div><aside className="preview"><div className="preview-head">LIVE SAMPLE <span>● DEMO DATA</span></div><div className="preview-title">What is ready today</div>{records.slice(0,3).map((r,i)=><div className="peek" key={r.id}><div><b>{r.title}</b><br/><small>{r[cfg.fields[1]]}</small></div><span>{i===0?'NOW':'SAVED'}</span></div>)}<div className="preview-foot">No account. No sync. Export when you choose.</div></aside></section><section className="section"><p className="eyebrow">01 / FIRST RECORD</p><h2>Begin with a record you will need again.</h2><p>Choose an exercise, answer it without pressure, use the hint, then record what needs another pass.</p><div className="card-grid"><div className="info-card"><strong>1. Name the detail</strong><p>Use the first field for the thing you will search for later, rather than a vague catch-all.</p></div><div className="info-card"><strong>2. Add context</strong><p>Record the practical facts beside it: status, timing, and the note that explains the decision.</p></div><div className="info-card"><strong>3. Review deliberately</strong><p>Search your local history, export when needed, and remove data that is no longer useful.</p></div></div></section><section className="section story"><p className="eyebrow">02 / WHY THIS RECORD EXISTS</p><h2>Small details are where useful decisions begin.</h2><p>{cfg.purpose} This is deliberately a local record rather than a social feed, an account portal, or an automated recommendation. It gives you a calm place to capture the exact fact, its context, and the practical next question while you still remember why it matters.</p><p>Every entry is searchable by the words you wrote. Use concise fields for things you expect to compare later, then use the note for nuance: an exception, an uncertainty, or the reason a future version of you should pause before acting.</p></section><section className="section"><p className="eyebrow">03 / THE CURRENT DESK</p><h2>Ten examples, clearly fictional.</h2><p>The first records are labelled demo data. They exist to demonstrate active, scheduled, reviewed, and archived states—never to imply real people, transactions, outcomes, or activity.</p><div className="card-grid">{records.slice(0,6).map((r,i)=><div className="info-card" key={r.id}><strong>{String(i+1).padStart(2,'0')} · {r.title}</strong><p>{r[cfg.fields[1]]} · {r[cfg.fields[2]]}<br/>{r[cfg.fields[4]]}</p></div>)}</div></section><section className="section"><p className="eyebrow">04 / A PRACTICAL LOOP</p><h2>Capture. Review. Carry forward.</h2><div className="card-grid"><div className="info-card"><strong>Capture</strong><p>Open the workspace when the detail is fresh. The required title prevents a record that cannot be found later.</p></div><div className="info-card"><strong>Review</strong><p>Search by a name, category, status, or note. Empty results are an invitation to change the query, not a dead end.</p></div><div className="info-card"><strong>Carry forward</strong><p>Export a Markdown or CSV copy before a handoff, a planning session, or a browser reset. Local data is yours to move.</p></div></div></section><section className="section"><p className="eyebrow">05 / WHAT THE TOOL DOES NOT DO</p><h2>Clear boundaries are part of the design.</h2><p>This app does not silently synchronize, infer facts, send reminders, or make a recommendation for you. Dates, labels, financial figures, health-related notes, disposal guidance, and any decisions based on them depend entirely on the information you enter and the context you verify.</p></section><section className="section"><p className="eyebrow">06 / KEEP A PORTABLE COPY</p><h2>Local-first should never mean trapped.</h2><p>Use JSON import and export for a browser-local backup, or CSV and Markdown when you need a readable copy. Imported JSON replaces the current local collection only after the file is successfully parsed; malformed files leave the saved records unchanged and show a clear error.</p></section><section className="section"><p className="eyebrow">07 / CONTINUE IN THE TOOL</p><h2>Use the real workspace, not a mock-up.</h2><p>The preview above is built from the same saved records used in the workspace. Open it to add, edit, remove, filter, import, and export local data.</p><div className="actions"><button className="primary" onClick={open}>Open workspace</button></div></section><footer className="section footer"><p className="eyebrow">08 / LOCAL PROJECT NOTES</p><p>This product stores its data in the active browser profile. Read the guide and limitations before relying on it for a consequential decision.</p></footer></>}
-function Workspace(){return <section className="workspace"><div className="toolbar"><input aria-label="Search records" value={query} onChange={e=>setQuery(e.target.value)} placeholder={'Search '+cfg.name}/><button onClick={()=>download(cfg.slug+'.md',toMarkdown(cfg.name,records))}>Export Markdown</button><button onClick={()=>download(cfg.slug+'.csv',csv(records),'text/csv')}>Export CSV</button><button onClick={()=>download(cfg.slug+'.json',JSON.stringify(records,null,2),'application/json')}>Export JSON</button><label className="import">Import JSON<input type="file" accept="application/json" onChange={e=>importJson(e.target.files?.[0])}/></label></div><div className="grid"><form onSubmit={add}><h2>Add music</h2>{cfg.fields.map((f,i)=><label key={f}>{f}<input required={i===0} value={form[f]||''} onChange={e=>setForm({...form,[f]:e.target.value})} placeholder={'Enter '+f.toLowerCase()}/></label>)}<button className="primary">{editing?'Save changes':'Save record'}</button>{editing&&<button type="button" onClick={()=>{setEditing(null);setForm({})}}>Cancel edit</button>}{notice&&<p className="notice" role="status">{notice}</p>}</form><article className="records"><h2>{filtered.length} records</h2>{filtered.length===0?<p className="empty">No records match that search. Clear the search or create the first local record.</p>:filtered.map(r=><section className="card" key={r.id}><div><h3>{r.title}</h3>{cfg.fields.slice(1).map(f=><p key={f}><b>{f}</b> {r[f]||'—'}</p>)}</div><div><button onClick={()=>{setEditing(r);const values:Record<string,string>={};cfg.fields.forEach(f=>values[f]=r[f]||'');setForm(values);window.scrollTo({top:0,behavior:'smooth'})}}>Edit</button><button onClick={()=>{save(records.filter(x=>x.id!==r.id));setNotice('Record removed from this browser.')}}>Delete</button></div></section>)}</article></div><Special/></section>}
-function NotFound(){return <section className="section"><p className="eyebrow">404 / LOCAL ROUTE</p><h2>That page is not in this edition.</h2><p>Use the navigation to return to a known section.</p><button className="primary" onClick={()=>setPage('home')}>Return home</button></section>}
-function Guide({title}:{title:string}){return <Content kicker="02 / FIELD GUIDE" title={title} body="note, interval, scale, chord are the working vocabulary in this tool. The guide does not prescribe a single right process; it explains what each field records, why it is there, and how to keep the record useful over time." cards={[['Use plain language','Write the term that a future version of you will recognise quickly.'],['Keep dates practical','Use a date only when it helps you decide what to do or review next.'],['Separate facts from notes','Use short fields for filtering and the note for the detail that does not fit a label.']]}/>}
-function Examples(){return <Content kicker="03 / WORKED EXAMPLES" title="A record with enough context." body="The sample records are fictional and labelled as demo data. They show the difference between a title that can be found, structured fields that can be scanned, and a note that preserves the reason behind a decision." cards={[['A current item','Marked In focus, with a near date and a concise note.'],['A scheduled item','Has a future date so it appears when you are planning ahead.'],['An edge case','Uses a longer note to prove that more context remains readable.']]}/>}
-function Reference(){return <Content kicker="04 / METHOD" title="How this local tool handles information." body="Tone Lab stores records in this browser using localStorage. Search runs against the saved local data. Markdown and CSV exports are created in your browser. There is no account, server synchronization, automatic backup, or claim that this record is authoritative outside the information you enter." cards={[['Local first','Your records remain in the active browser profile until you export or remove them.'],['Simple exports','Exports are designed to be readable and portable, not a full database backup format.'],['Human review','Dates, amounts, labels, and reminders depend on the data you enter and should be checked before acting.']]}/>}
-function Help(){return <section className="section"><p className="eyebrow">05 / HELP & LIMITS</p><h2>Useful boundaries make a tool more trustworthy.</h2><div className="faq"><details open><summary>Where is my data stored?</summary><p>In localStorage for this browser profile. Clearing browser data may remove it; use an export for a copy you control.</p></details><details><summary>Is the demo data real?</summary><p>No. It is fictional sample material designed to show populated, long-text, status, and archive states.</p></details><details><summary>What happens when a form is incomplete?</summary><p>The first field is required. The form gives a plain-language message and keeps the entered values available to correct.</p></details><details><summary>Can this replace specialist advice?</summary><p>No. It is a personal organization aid. The limitations and relevant disclaimers should guide how you use the records.</p></details></div></section>}
-function Content({kicker,title,body,cards}:{kicker:string;title:string;body:string;cards:string[][]}){return <section className="section"><p className="eyebrow">{kicker}</p><h2>{title}</h2><p>{body}</p><div className="card-grid">{cards.map(c=><div className="info-card" key={c[0]}><strong>{c[0]}</strong><p>{c[1]}</p></div>)}</div></section>}
-function Special(){if((cfg.kind as string)==='algorithm')return <section className="lab"><h2>Visible operations</h2><p>Use these controls to see an ordered set change. They are deliberately small: the explanation matters more than spectacle.</p><button onClick={()=>setAnswer('Values sorted: 4, 7, 12, 19')}>Sort sample</button><button onClick={()=>setAnswer('One comparison explained: 12 is greater than 7, so it moves after 7.')}>Explain step</button><p role="status">{answer}</p></section>;if((cfg.kind as string)==='garden')return <section className="lab"><h2>Bed grid</h2><div className="bed">{Array.from({length:12},(_,i)=><button key={i} onClick={()=>setAnswer('Plant marker placed in bed cell '+(i+1))}>{answer.includes(String(i+1))?'●':'+'}</button>)}</div><p role="status">{answer||'Select a cell to place a marker.'}</p></section>;return <section className="lab"><h2>Practice note</h2><p>Use this local workspace with the guide alongside it. A good record is specific enough to help later and short enough to keep current.</p></section>}}
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Field, Landing, NotFound, Notice, PageHead, Shell, useFlash, usePersistentState, useRoute } from './shared/ui';
+import { CHORDS, KEYS, ROOTS, SCALES, SEMITONE_NAMES, SHARP_NAMES, intervalName, midiFreq, noteName, parseNote, samePitchSet, spellChord, spellScale, toMidi } from './lib/theory';
+
+const KEY = 'tone-lab:store';
+const NAV = [
+  { to: '/', label: 'Overview' },
+  { to: '/scales', label: 'Scales' },
+  { to: '/chords', label: 'Chords' },
+  { to: '/intervals', label: 'Intervals' },
+  { to: '/practice', label: 'Practice' },
+];
+const COMPUTER_KEYS = ['a', 'w', 's', 'e', 'd', 'f', 't', 'g', 'y', 'h', 'u', 'j', 'k']; // C4 … C5
+
+interface Stats {
+  answered: number;
+  correct: number;
+  best: number;
+  byType: Record<string, { answered: number; correct: number }>;
+}
+interface Store {
+  muted: boolean;
+  stats: Stats;
+}
+
+/* ---------- Audio ---------- */
+let ctx: AudioContext | null = null;
+function audio(): AudioContext | null {
+  if (typeof window === 'undefined' || !('AudioContext' in window)) return null;
+  ctx ??= new AudioContext();
+  if (ctx.state === 'suspended') void ctx.resume();
+  return ctx;
+}
+function playNote(midi: number, when = 0, dur = 0.6) {
+  const a = audio();
+  if (!a) return;
+  const t = a.currentTime + when;
+  const osc = a.createOscillator(), osc2 = a.createOscillator(), gain = a.createGain();
+  osc.type = 'triangle';
+  osc2.type = 'sine';
+  osc.frequency.value = midiFreq(midi);
+  osc2.frequency.value = midiFreq(midi) * 2;
+  const g2 = a.createGain();
+  g2.gain.value = 0.15;
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(0.22, t + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.connect(gain);
+  osc2.connect(g2).connect(gain);
+  gain.connect(a.destination);
+  osc.start(t); osc2.start(t);
+  osc.stop(t + dur + 0.05); osc2.stop(t + dur + 0.05);
+}
+
+export default function App() {
+  const [route] = useRoute();
+  const [store, setStore] = usePersistentState<Store>(KEY, { muted: false, stats: { answered: 0, correct: 0, best: 0, byType: {} } });
+  const play = (notes: number[], mode: 'seq' | 'block' = 'seq') => { if (!store.muted) notes.forEach((m, i) => playNote(m, mode === 'seq' ? i * 0.32 : 0, mode === 'seq' ? 0.5 : 1.2)); };
+  const ctxp = { store, setStore, play };
+  let page: ReactNode;
+  if (route === '/') page = <Home />;
+  else if (route === '/scales') page = <Scales {...ctxp} />;
+  else if (route === '/chords') page = <Chords {...ctxp} />;
+  else if (route === '/intervals') page = <Intervals {...ctxp} />;
+  else if (route === '/practice') page = <Practice {...ctxp} />;
+  else page = <NotFound />;
+  return (
+    <Shell name="Tone Lab" wordmark={['Tone', 'Lab']} nav={NAV} route={route} cta={{ to: '/practice', label: 'Practise' }} footerNote="Sound is generated in your browser with the Web Audio API. Nothing is recorded or uploaded.">
+      {route !== '/' && <div className="sound-toggle"><button type="button" className="btn btn-sm" aria-pressed={!store.muted} onClick={() => setStore({ ...store, muted: !store.muted })}>{store.muted ? 'Sound off' : 'Sound on'}</button></div>}
+      {page}
+    </Shell>
+  );
+}
+
+type Ctx = { store: Store; setStore: (s: Store) => void; play: (notes: number[], mode?: 'seq' | 'block') => void };
+
+/* ---------- Piano ---------- */
+export function Piano({ lit = [], marks = {}, onKey, selected = [], label, compact }: { lit?: number[]; marks?: Record<number, string>; onKey?: (midi: number) => void; selected?: number[]; label: string; compact?: boolean }) {
+  const [down, setDown] = useState<number | null>(null);
+  const whites = KEYS.filter((k) => !k.black);
+  const ref = useRef<HTMLDivElement>(null);
+  function press(m: number) {
+    setDown(m);
+    onKey?.(m);
+    setTimeout(() => setDown((d) => (d === m ? null : d)), 180);
+  }
+  function onKeyDown(e: React.KeyboardEvent) {
+    const i = COMPUTER_KEYS.indexOf(e.key.toLowerCase());
+    if (i >= 0 && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); press(60 + i); }
+  }
+  const whiteIndex = (midi: number) => whites.findIndex((w) => w.midi === midi);
+  return (
+    <div className={`piano ${compact ? 'is-compact' : ''}`} ref={ref} onKeyDown={onKeyDown} role="group" aria-label={label}>
+      <div className="whites">
+        {whites.map((k) => (
+          <button key={k.midi} type="button" className={`key white ${lit.includes(k.midi) ? 'lit' : ''} ${selected.includes(k.midi) ? 'sel' : ''} ${down === k.midi ? 'down' : ''}`} tabIndex={onKey ? 0 : -1} aria-pressed={onKey ? selected.includes(k.midi) : undefined}
+            aria-label={`${SHARP_NAMES[k.pc]}${k.octave}${lit.includes(k.midi) ? ` (${marks[k.midi] ?? 'highlighted'})` : ''}`} onClick={() => press(k.midi)}>
+            {marks[k.midi] && <span className="mark">{marks[k.midi]}</span>}
+            {!compact && k.pc === 0 && <span className="c-label">C{k.octave}</span>}
+          </button>
+        ))}
+      </div>
+      {KEYS.filter((k) => k.black).map((k) => (
+        <button key={k.midi} type="button" className={`key black ${lit.includes(k.midi) ? 'lit' : ''} ${selected.includes(k.midi) ? 'sel' : ''} ${down === k.midi ? 'down' : ''}`} tabIndex={onKey ? 0 : -1} aria-pressed={onKey ? selected.includes(k.midi) : undefined}
+          style={{ left: `calc(${((whiteIndex(k.midi - 1) + 1) / whites.length) * 100}% - var(--bw) / 2)` }}
+          aria-label={`${SHARP_NAMES[k.pc]}${k.octave}${lit.includes(k.midi) ? ` (${marks[k.midi] ?? 'highlighted'})` : ''}`} onClick={() => press(k.midi)}>
+          {marks[k.midi] && <span className="mark">{marks[k.midi]}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function HeroPreview() {
+  const root = parseNote('D')!;
+  const notes = spellScale(root, 'major');
+  const midis = toMidi(notes);
+  return (
+    <div className="hero-tl">
+      <div className="row-between"><strong className="hero-tl-title">D major</strong><span className="small muted">two sharps · F♯ and C♯</span></div>
+      <Piano lit={midis} marks={Object.fromEntries(midis.map((m, i) => [m, noteName(notes[i])]))} label="D major scale on a keyboard" compact />
+      <ol className="degrees">{notes.map((x, i) => <li key={i}><span className="mono small">{i + 1}</span><b>{noteName(x)}</b></li>)}</ol>
+    </div>
+  );
+}
+
+function Home() {
+  return (
+    <Landing
+      eyebrow="Music theory, hands on"
+      title={<>See it, hear it, <em>spell it right.</em></>}
+      lead="An interactive keyboard for exploring scales, chords and intervals — every note spelled the way a musician would write it — plus quick drills that check what you’ve learned."
+      primary={{ href: '#/scales', label: 'Explore scales' }}
+      secondary={{ href: '#/practice', label: 'Try a drill' }}
+      previewLabel="Scale explorer — live"
+      preview={<HeroPreview />}
+      steps={[
+        { title: 'Pick a root and a shape', body: 'Twelve keys, seven scales and nine chord types, lit up on a two-octave keyboard.' },
+        { title: 'Play it', body: 'Click keys or use your computer keyboard (A–K row) and hear each note through Web Audio.' },
+        { title: 'Test yourself', body: 'Name intervals and chords, or build scales on the keys, with instant feedback and a score.' },
+      ]}
+      stepsIntro="No sign-up and no samples to download — Tone Lab synthesises its sound in the browser."
+      features={[
+        { title: 'Correct spelling', body: 'F major has B♭, not A♯; F♯ major has E♯. Letter names follow the theory, not the nearest black key.' },
+        { title: 'Intervals by name', body: 'Minor 3rd, augmented 4th, diminished 5th — named from the letters as well as the semitones.' },
+        { title: 'Keyboard friendly', body: 'Every key is a button with a spoken name; A W S E D F T G Y H U J K play an octave.' },
+        { title: 'Practice that remembers', body: 'Your best streak and accuracy by drill type are kept in this browser.' },
+      ]}
+      note="Tone Lab is a learning aid. Sound requires a browser with Web Audio; everything else works without it."
+      closing={{ title: <>Theory is easier <em>when you can hear it.</em></>, action: { href: '#/scales', label: 'Start exploring' } }}
+    />
+  );
+}
+
+function RootPicker({ root, setRoot }: { root: string; setRoot: (r: string) => void }) {
+  return <Field label="Root">{(p) => <select {...p} value={root} onChange={(e) => setRoot(e.target.value)}>{ROOTS.map((r) => <option key={r} value={r}>{noteName(parseNote(r)!)}</option>)}</select>}</Field>;
+}
+
+function Scales({ play }: Ctx) {
+  const [root, setRoot] = useState('C');
+  const [scale, setScale] = useState('major');
+  const notes = spellScale(parseNote(root)!, scale);
+  const midis = toMidi(notes);
+  const withOctave = [...midis, midis[0] + 12];
+  return (
+    <div className="stack">
+      <PageHead eyebrow="Scales" title={<>{noteName(parseNote(root)!)} <em>{SCALES[scale].name.toLowerCase()}</em></>} actions={<button type="button" className="btn btn-primary" onClick={() => play(withOctave)}>Play scale ▶</button>} />
+      <div className="card filters">
+        <RootPicker root={root} setRoot={setRoot} />
+        <Field label="Scale">{(p) => <select {...p} value={scale} onChange={(e) => setScale(e.target.value)}>{Object.entries(SCALES).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}</select>}</Field>
+      </div>
+      <section className="card stack">
+        <Piano lit={midis} marks={Object.fromEntries(midis.map((m, i) => [m, noteName(notes[i])]))} onKey={(m) => play([m])} label={`${noteName(parseNote(root)!)} ${SCALES[scale].name} on a keyboard; keys are playable`} />
+        <ol className="degrees" data-testid="spelling">{notes.map((x, i) => <li key={i}><span className="mono small">{i + 1}</span><b>{noteName(x)}</b><span className="small muted">{i ? SEMITONE_NAMES[SCALES[scale].steps[i][0]] : 'root'}</span></li>)}</ol>
+        <p className="small muted">{notes.filter((x) => x.acc > 0).length ? `${notes.filter((x) => x.acc > 0).length} sharp${notes.filter((x) => x.acc > 0).length === 1 ? '' : 's'}` : notes.filter((x) => x.acc < 0).length ? `${notes.filter((x) => x.acc < 0).length} flat${notes.filter((x) => x.acc < 0).length === 1 ? '' : 's'}` : 'No sharps or flats'} · each letter appears once{scale.includes('pent') ? ' (pentatonic scales skip two)' : ''}.</p>
+      </section>
+    </div>
+  );
+}
+
+function Chords({ play }: Ctx) {
+  const [root, setRoot] = useState('C');
+  const [q, setQ] = useState('maj');
+  const r = parseNote(root)!;
+  const notes = spellChord(r, q);
+  const midis = toMidi(notes);
+  return (
+    <div className="stack">
+      <PageHead eyebrow="Chords" title={<>{noteName(r)}{CHORDS[q].symbol} <em>· {CHORDS[q].name.toLowerCase()}</em></>} actions={<><button type="button" className="btn btn-primary" onClick={() => play(midis, 'block')}>Play chord ▶</button><button type="button" className="btn" onClick={() => play(midis)}>Arpeggio</button></>} />
+      <div className="card filters">
+        <RootPicker root={root} setRoot={setRoot} />
+        <Field label="Quality">{(p) => <select {...p} value={q} onChange={(e) => setQ(e.target.value)}>{Object.entries(CHORDS).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}</select>}</Field>
+      </div>
+      <section className="card stack">
+        <Piano lit={midis} marks={Object.fromEntries(midis.map((m, i) => [m, noteName(notes[i])]))} onKey={(m) => play([m])} label={`${noteName(r)}${CHORDS[q].symbol} chord on a keyboard`} />
+        <div className="table-wrap"><table className="table"><caption className="sr-only">Chord tones</caption><thead><tr><th scope="col">Tone</th><th scope="col">Note</th><th scope="col">Interval from root</th><th scope="col" className="num">Semitones</th></tr></thead>
+          <tbody>{notes.map((x, i) => <tr key={i}><td>{['Root', '', '3rd', '4th', '5th', '', '7th'][CHORDS[q].steps[i][1]] || `${CHORDS[q].steps[i][1] + 1}th`}</td><td><b>{noteName(x)}</b></td><td>{i ? intervalName(r, x) : 'Unison'}</td><td className="num">{CHORDS[q].steps[i][0]}</td></tr>)}</tbody></table></div>
+      </section>
+    </div>
+  );
+}
+
+function Intervals({ play }: Ctx) {
+  const [picked, setPicked] = useState<number[]>([60, 64]);
+  const [lo, hi] = [...picked].sort((a, b) => a - b);
+  const semis = hi != null ? hi - lo : null;
+  function onKey(m: number) {
+    play([m]);
+    setPicked((p) => (p.length >= 2 ? [m] : p.includes(m) ? p : [...p, m]));
+  }
+  return (
+    <div className="stack">
+      <PageHead eyebrow="Intervals" title={<>The distance <em>between two notes.</em></>} description="Click two keys. The first click after a pair starts a new one." actions={hi != null && <button type="button" className="btn btn-primary" onClick={() => play([lo, hi])}>Play interval ▶</button>} />
+      <section className="card stack">
+        <Piano lit={picked} selected={picked} onKey={onKey} label="Pick two keys to name the interval" />
+        <div className="interval-out" aria-live="polite" data-testid="interval">
+          {semis == null ? <p className="muted">Pick a second key.</p> : <>
+            <b className="display-num">{SEMITONE_NAMES[semis] ?? `${semis} semitones`}</b>
+            <span className="small">{SHARP_NAMES[lo % 12]} → {SHARP_NAMES[hi % 12]} · {semis} semitone{semis === 1 ? '' : 's'} · frequency ratio {(midiFreq(hi) / midiFreq(lo)).toFixed(3)}</span>
+            {semis === 6 && <span className="small muted">Spelled F–B it’s an augmented 4th; spelled B–F it’s a diminished 5th.</span>}
+          </>}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/* ---------- Practice ---------- */
+type Q = { type: 'interval'; lo: number; hi: number; answer: string; options: string[] } | { type: 'chord'; root: string; q: string; midis: number[]; answer: string; options: string[] } | { type: 'scale'; root: string; scale: string; target: number[] };
+const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
+const shuffle = <T,>(xs: T[]) => [...xs].sort(() => Math.random() - 0.5);
+
+function makeQuestion(type: Q['type']): Q {
+  if (type === 'interval') {
+    const lo = 60 + Math.floor(Math.random() * 12), semis = 1 + Math.floor(Math.random() * 12);
+    const answer = SEMITONE_NAMES[semis];
+    return { type, lo, hi: lo + semis, answer, options: shuffle([answer, ...shuffle(SEMITONE_NAMES.slice(1).filter((x) => x !== answer)).slice(0, 3)]) };
+  }
+  if (type === 'chord') {
+    const root = pick(ROOTS), q = pick(['maj', 'min', 'dim', 'aug', 'dom7', 'maj7', 'min7']);
+    const answer = `${noteName(parseNote(root)!)}${CHORDS[q].symbol}`;
+    const others = shuffle(Object.keys(CHORDS).filter((k) => k !== q)).slice(0, 3).map((k) => `${noteName(parseNote(root)!)}${CHORDS[k].symbol}`);
+    return { type, root, q, midis: toMidi(spellChord(parseNote(root)!, q)), answer, options: shuffle([answer, ...others]) };
+  }
+  const root = pick(['C', 'G', 'D', 'F', 'A', 'E', 'Bb']), scale = pick(['major', 'minor']);
+  return { type, root, scale, target: toMidi(spellScale(parseNote(root)!, scale)) };
+}
+
+function Practice({ store, setStore, play }: Ctx) {
+  const [type, setType] = useState<Q['type']>('interval');
+  const [q, setQ] = useState<Q>(() => makeQuestion('interval'));
+  const [chosen, setChosen] = useState<string | null>(null);
+  const [sel, setSel] = useState<number[]>([]);
+  const [run, setRun] = useState(0);
+  const [flash, setFlash] = useFlash(3000);
+  const s = store.stats;
+  const acc = s.answered ? Math.round((s.correct / s.answered) * 100) : null;
+  useEffect(() => { setQ(makeQuestion(type)); setChosen(null); setSel([]); }, [type]);
+  const record = (ok: boolean) => {
+    const bt = s.byType[q.type] ?? { answered: 0, correct: 0 };
+    const nextRun = ok ? run + 1 : 0;
+    setRun(nextRun);
+    setStore({ ...store, stats: { answered: s.answered + 1, correct: s.correct + (ok ? 1 : 0), best: Math.max(s.best, nextRun), byType: { ...s.byType, [q.type]: { answered: bt.answered + 1, correct: bt.correct + (ok ? 1 : 0) } } } });
+  };
+  function answer(opt: string) {
+    if (chosen || q.type === 'scale') return;
+    setChosen(opt);
+    record(opt === q.answer);
+  }
+  function checkScale() {
+    if (q.type !== 'scale') return;
+    const ok = samePitchSet(sel, q.target);
+    setChosen(ok ? 'right' : 'wrong');
+    record(ok);
+    if (!ok) setFlash({ kind: 'error', text: `Not quite — the highlighted keys show ${noteName(parseNote(q.root)!)} ${SCALES[q.scale].name.toLowerCase()}.` });
+  }
+  function next() { setQ(makeQuestion(type)); setChosen(null); setSel([]); }
+  const byType = useMemo(() => Object.entries(s.byType), [s]);
+  return (
+    <div className="stack">
+      <PageHead eyebrow="Practice" title={<>Quick <em>drills.</em></>} />
+      <div className="stats">
+        <div className="stat"><span className="stat-label">Current run</span><span className="stat-value" data-testid="run">{run}</span></div>
+        <div className="stat"><span className="stat-label">Best run</span><span className="stat-value">{s.best}</span></div>
+        <div className="stat"><span className="stat-label">Accuracy</span><span className="stat-value">{acc == null ? '—' : `${acc}%`}</span><span className="small muted">{s.answered} answered{byType.length ? ` · ${byType.map(([k, v]) => `${k} ${Math.round((v.correct / v.answered) * 100)}%`).join(', ')}` : ''}</span></div>
+      </div>
+      <div className="tabs" role="radiogroup" aria-label="Drill">
+        {([['interval', 'Name the interval'], ['chord', 'Name the chord'], ['scale', 'Build the scale']] as const).map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={type === k} onClick={() => setType(k)}>{l}</button>)}
+      </div>
+      {flash && <Notice kind={flash.kind} onDismiss={() => setFlash(null)}>{flash.text}</Notice>}
+      <section className="card stack drill" aria-live="polite">
+        {q.type === 'interval' && <>
+          <p className="drill-q">What’s the interval between the two lit keys?</p>
+          <Piano lit={[q.lo, q.hi]} label="Two highlighted keys" />
+          <div className="row"><button type="button" className="btn btn-sm" onClick={() => play([q.lo, q.hi])}>Hear it ▶</button></div>
+        </>}
+        {q.type === 'chord' && <>
+          <p className="drill-q">Which chord is lit?</p>
+          <Piano lit={q.midis} label="Highlighted chord" />
+          <div className="row"><button type="button" className="btn btn-sm" onClick={() => play(q.midis, 'block')}>Hear it ▶</button></div>
+        </>}
+        {q.type !== 'scale' && (
+          <div className="options">
+            {q.options.map((o) => <button key={o} type="button" className={`btn option ${chosen ? (o === q.answer ? 'right' : o === chosen ? 'wrong' : '') : ''}`} disabled={!!chosen} onClick={() => answer(o)}>{o}</button>)}
+          </div>
+        )}
+        {q.type === 'scale' && <>
+          <p className="drill-q">Select the notes of <strong>{noteName(parseNote(q.root)!)} {SCALES[q.scale].name.toLowerCase()}</strong> (one octave), then check.</p>
+          <Piano lit={chosen === 'wrong' ? q.target : []} selected={sel} onKey={(m) => { if (chosen) return; play([m]); setSel(sel.includes(m) ? sel.filter((x) => x !== m) : [...sel, m]); }} label="Select keys to build the scale" />
+          {!chosen && <div className="row"><button type="button" className="btn btn-primary" disabled={!sel.length} onClick={checkScale}>Check ({sel.length} selected)</button><button type="button" className="btn btn-ghost" onClick={() => setSel([])}>Clear</button></div>}
+        </>}
+        {chosen && (
+          <div className={`result ${(q.type === 'scale' ? chosen === 'right' : chosen === q.answer) ? 'ok' : 'no'}`} role="status">
+            <strong>{(q.type === 'scale' ? chosen === 'right' : chosen === q.answer) ? 'Correct!' : `Not quite${q.type !== 'scale' ? ` — it’s ${q.answer}` : ''}.`}</strong>
+            {q.type === 'chord' && <span className="small"> Notes: {spellChord(parseNote(q.root)!, q.q).map((x) => noteName(x)).join(' – ')}</span>}
+            <button type="button" className="btn btn-primary btn-sm" onClick={next} autoFocus>Next question →</button>
+          </div>
+        )}
+      </section>
+      <p className="small muted">Tip: with a keyboard focused, the A–K row (A W S E D F T G Y H U J K) plays C4 to C5.</p>
+    </div>
+  );
+}
