@@ -2,7 +2,7 @@
 
 Hands-on music theory: a playable two-octave keyboard (mouse, touch or computer keys) with Web Audio sound, scale and chord explorers that spell every note correctly for its key, an interval finder, and quick drills with a score.
 
-**Live demo:** [https://tone-lab.vercel.app/](https://tone-lab.vercel.app/) — runs entirely in your browser.
+**Live demo:** [https://tone-lab-app.vercel.app/](https://tone-lab-app.vercel.app/) — runs entirely in your browser.
 
 ![Landing with D major on the keyboard](docs/landing.png)
 
